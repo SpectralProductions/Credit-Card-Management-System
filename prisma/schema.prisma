@@ -217,3 +217,37 @@ enum PaymentMethod {
   NEFT
   AUTO_DEBIT
 }
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  details   String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model CardLock {
+  id        String   @id @default(cuid())
+  cardId    String
+  reason    String
+  lockedAt  DateTime @default(now())
+  isActive  Boolean  @default(true)
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
