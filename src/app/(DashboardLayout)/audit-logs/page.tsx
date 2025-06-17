@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -28,6 +28,16 @@ export default function AuditLogPage() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setFormData((prev) => ({
+        ...prev,
+        userAgent: navigator.userAgent || '',
+        ipAddress: '', // You may fetch actual IP from a server or external service if needed
+      }));
+    }
+  }, []);
+
   const handleTextFieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -53,10 +63,7 @@ export default function AuditLogPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          userId: session?.user?.id,
-          ...formData,
-        }),
+        body: JSON.stringify(formData),
       });
 
       const data = await response.json();
@@ -71,7 +78,7 @@ export default function AuditLogPage() {
         ipAddress: '',
         userAgent: '',
       });
-      router.refresh?.(); // Safe call in case router doesn't have `refresh`
+      router.refresh?.(); // Optional: reloads current page route
     } catch (err: any) {
       setError(err.message || 'An error occurred while logging the audit');
     } finally {
@@ -123,7 +130,7 @@ export default function AuditLogPage() {
 
           <TextField
             fullWidth
-            label="IP Address"
+            label="IP Address (optional)"
             name="ipAddress"
             value={formData.ipAddress}
             onChange={handleTextFieldChange}

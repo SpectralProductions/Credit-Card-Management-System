@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
     const auditLog = await prisma.auditLog.create({
       data: {
         action,
-        details,
-        ipAddress,
-        userAgent,
+        details: details || null,
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
         userId: session.user.id,
       },
     });
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ auditLogs });
+    return NextResponse.json({ auditLogs }, { status: 200 });
   } catch (error) {
     console.error('Error fetching audit logs:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
