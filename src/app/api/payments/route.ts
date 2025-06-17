@@ -4,27 +4,22 @@ import { authOptions } from '../auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { PaymentMethod } from '@prisma/client';
 
+// ✅ POST method to create a new payment
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await getServerSession(authOptions); // ✅ No `req` needed in App Router
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { cardId, amount, method } = body;
 
     if (!cardId || !amount || !method) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Verify card belongs to user
     const card = await prisma.card.findFirst({
       where: {
         id: cardId,
@@ -33,16 +28,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (!card) {
-      return NextResponse.json(
-        { error: 'Card not found or unauthorized' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Card not found or unauthorized' }, { status: 404 });
     }
 
-    // Start transaction
     const payment = await prisma.$transaction(async (tx) => {
-      // Create payment record
-      const payment = await tx.payment.create({
+      const createdPayment = await tx.payment.create({
         data: {
           cardId,
           userId: session.user.id,
@@ -51,7 +41,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Update card balance
       await tx.card.update({
         where: { id: cardId },
         data: {
@@ -61,27 +50,23 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return payment;
+      return createdPayment;
     });
 
     return NextResponse.json(payment);
   } catch (error) {
     console.error('Error processing payment:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
+// ✅ GET method to fetch all payments for the logged-in user
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await getServerSession(authOptions); // ✅ No `req` needed in App Router
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const payments = await prisma.payment.findMany({
@@ -103,9 +88,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ payments });
   } catch (error) {
     console.error('Error fetching payments:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

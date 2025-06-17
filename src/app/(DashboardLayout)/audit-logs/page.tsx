@@ -71,7 +71,7 @@ export default function AuditLogPage() {
         ipAddress: '',
         userAgent: '',
       });
-      router.refresh();
+      router.refresh?.(); // Safe call in case router doesn't have `refresh`
     } catch (err: any) {
       setError(err.message || 'An error occurred while logging the audit');
     } finally {

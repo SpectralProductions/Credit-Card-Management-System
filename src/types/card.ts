@@ -15,4 +15,8 @@ export interface Card {
   updatedAt: Date;
   status: CardStatus;
   activationDate: Date;
+  currency?: string;         // e.g., 'INR', 'USD' (for international support)
+  country?: string;          // Country of issuance
+  isVirtual?: boolean;       // To support virtual cards
+  lockedReason?: string;
 } 
