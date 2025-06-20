@@ -5,7 +5,7 @@ import EmailProvider from "next-auth/providers/email";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 
-// Extend the built-in session types
+// 1️⃣ EXTEND NEXT-AUTH TYPES (move to a *.d.ts file if needed)
 declare module "next-auth" {
   interface User {
     id: string;
@@ -27,25 +27,12 @@ declare module "next-auth" {
   }
   interface Session {
     user: User & {
-      id: string;
-      firstName: string;
-      lastName: string;
-      userRoles: any[];
-      roles: any[];
-      contact?: {
-        id: string;
-        email: string;
-        phone?: string;
-        address?: string;
-        city?: string;
-        state?: string;
-        zip?: string;
-        country?: string;
-      };
+      name: string;
     };
   }
 }
 
+// 2️⃣ AUTH OPTIONS
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -55,47 +42,36 @@ export const authOptions: NextAuthOptions = {
         port: Number(process.env.SMTP_PORT),
         auth: {
           user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASSWORD
-        }
+          pass: process.env.SMTP_PASSWORD,
+        },
       },
       from: process.env.SMTP_FROM,
     }),
     CredentialsProvider({
-      name: "credentials",
+      name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials, req) {
+      async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Email and password are required");
         }
 
         const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email,
-          },
+          where: { email: credentials.email },
           include: {
-            userRoles: {
-              include: {
-                role: true
-              }
-            }
+            userRoles: { include: { role: true } },
           },
         });
 
-        if (!user) {
-          throw new Error("User not found");
-        }
-
-        if (!user.password) {
-          throw new Error("Password not set. Please use social login or reset your password.");
+        if (!user || !user.password) {
+          throw new Error("Invalid credentials");
         }
 
         const isPasswordValid = await compare(credentials.password, user.password);
-
         if (!isPasswordValid) {
-          throw new Error("Invalid password");
+          throw new Error("Invalid credentials");
         }
 
         return {
@@ -104,7 +80,7 @@ export const authOptions: NextAuthOptions = {
           firstName: user.firstName,
           lastName: user.lastName,
           userRoles: user.userRoles,
-          name: `${user.firstName} ${user.lastName}`
+          name: `${user.firstName} ${user.lastName}`,
         };
       },
     }),
@@ -114,17 +90,16 @@ export const authOptions: NextAuthOptions = {
     error: "/error",
   },
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
-        // For both providers, fetch the complete user data
         const dbUser = await prisma.user.findUnique({
-          where: { email: user.email },
+          where: { email: user.email ?? "" },
           include: {
             userRoles: {
               include: {
-                role: true
-              }
-            }
+                role: true,
+              },
+            },
           },
         });
 
@@ -133,13 +108,13 @@ export const authOptions: NextAuthOptions = {
           token.firstName = dbUser.firstName;
           token.lastName = dbUser.lastName;
           token.name = `${dbUser.firstName} ${dbUser.lastName}`;
-          token.roles = dbUser.roles.map((ur: { role: any }) => ur.role);
+          token.roles = dbUser.userRoles.map((ur) => ur.role);
         }
       }
       return token;
     },
     async session({ session, token }) {
-      if (token) {
+      if (session.user && token) {
         session.user.id = token.id as string;
         session.user.firstName = token.firstName as string;
         session.user.lastName = token.lastName as string;
@@ -151,16 +126,13 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account }) {
       if (!user?.email) return false;
 
-      // Check if the user exists in the database
       const existingUser = await prisma.user.findUnique({
         where: { email: user.email },
       });
 
-      if (!existingUser) {
-        return false;
-      }
+      if (!existingUser) return false;
 
-      // For email provider, ensure the user has a password set
+      // For email magic link login, ensure password exists
       if (account?.provider === "email" && !existingUser.password) {
         return false;
       }
@@ -172,34 +144,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  // cookies: {
-  //   sessionToken: {
-  //     name: `__Secure-next-auth.session-token`,
-  //     options: {
-  //       httpOnly: true,
-  //       sameSite: 'lax',
-  //       path: '/',
-  //       secure: true
-  //     }
-  //   },
-  //   callbackUrl: {
-  //     name: `__Secure-next-auth.callback-url`,
-  //     options: {
-  //       httpOnly: true,
-  //       sameSite: 'lax',
-  //       path: '/',
-  //       secure: true
-  //     }
-  //   },
-  //   csrfToken: {
-  //     name: `__Host-next-auth.csrf-token`,
-  //     options: {
-  //       httpOnly: true,
-  //       sameSite: 'lax',
-  //       path: '/',
-  //       secure: true
-  //     }
-  //   }
-  // },
   secret: process.env.NEXTAUTH_SECRET,
-}; 
+};

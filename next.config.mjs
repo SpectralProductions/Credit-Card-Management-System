@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false,
+  reactStrictMode: true,
   swcMinify: true, // Enables faster builds with the SWC compiler
   poweredByHeader: false, // Hides the 'X-Powered-By: Next.js' header
   eslint: {
