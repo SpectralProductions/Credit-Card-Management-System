@@ -117,7 +117,7 @@ export const authOptions: NextAuthOptions = {
           token.firstName = dbUser.firstName;
           token.lastName = dbUser.lastName;
           token.name = `${dbUser.firstName} ${dbUser.lastName}`;
-          token.roles = dbUser.userRoles.map((ur) => ur.role);
+          token.roles = dbUser.userRoles.map((ur: { role: any; }) => ur.role);
         }
       }
 
