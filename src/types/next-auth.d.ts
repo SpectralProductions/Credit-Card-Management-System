@@ -3,8 +3,6 @@ import { DefaultSession } from 'next-auth';
 import { User as PrismaUser } from '@prisma/client';
 
 declare module 'next-auth' {
-  interface User extends Omit<'emailVerified' | 'createdAt' | 'updatedAt'> {}
-
   interface Session {
     user: {
       id: string;
