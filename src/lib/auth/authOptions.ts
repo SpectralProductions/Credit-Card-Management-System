@@ -1,78 +1,34 @@
-// src/lib/auth/authOptions.ts
-import { NextAuthOptions } from 'next-auth';
+// src/lib/authOptions.ts
+import { AuthOptions } from 'next-auth';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
-import CredentialsProvider from 'next-auth/providers/credentials';
 import EmailProvider from 'next-auth/providers/email';
-import bcrypt from 'bcryptjs';
-import { prisma } from '@/lib/prisma';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import prisma from 'prisma'; // your Prisma client
+import { compare } from 'bcryptjs';
 
-export const authOptions: NextAuthOptions = {
+export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
+  providers: [
+    EmailProvider({
+      server: process.env.EMAIL_SERVER!,
+      from: process.env.EMAIL_FROM!,
+    }),
+    CredentialsProvider({
+      name: 'Credentials',
+      credentials: {
+        email: { label: 'Email', type: 'text' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        // Custom logic
+        return null;
+      },
+    }),
+  ],
   session: {
     strategy: 'jwt',
   },
   pages: {
-    signIn: '/login',
-    verifyRequest: '/verify-request',
-    error: '/error',
-  },
-  providers: [
-    EmailProvider({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST!,
-        port: Number(process.env.EMAIL_SERVER_PORT!),
-        auth: {
-          user: process.env.EMAIL_SERVER_USER!,
-          pass: process.env.EMAIL_SERVER_PASSWORD!,
-        },
-      },
-      from: process.env.EMAIL_FROM!,
-    }),
-    CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: {
-            userRoles: {
-              include: { role: true },
-            },
-          },
-        });
-
-        if (!user || !user.password) return null;
-
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isValid) return null;
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        };
-      },
-    }),
-  ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user && token.id) {
-        (session.user as { id: string }).id = token.id as string;
-      }
-      return session;
-    },
+    signIn: '/auth/signin',
   },
 };
