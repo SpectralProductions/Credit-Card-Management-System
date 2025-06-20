@@ -1,18 +1,19 @@
+// Imports
 import { NextAuthOptions } from "next-auth";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { prisma } from "./prisma";
+import { prisma } from "@/lib/prisma";
 import EmailProvider from "next-auth/providers/email";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 
-// 1️⃣ EXTEND NEXT-AUTH TYPES (move to a *.d.ts file if needed)
+// ✅ Type Augmentation — better moved to `types/next-auth.d.ts`
 declare module "next-auth" {
   interface User {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
-    userRoles: any[];
+    userRoles: { role: any }[]; // ✅ Type properly if you have a Role type
     roles?: any[];
     contact?: {
       id: string;
@@ -25,6 +26,7 @@ declare module "next-auth" {
       country?: string;
     };
   }
+
   interface Session {
     user: User & {
       name: string;
@@ -32,21 +34,32 @@ declare module "next-auth" {
   }
 }
 
-// 2️⃣ AUTH OPTIONS
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+    roles?: any[];
+  }
+}
+
+// ✅ AUTH OPTIONS
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     EmailProvider({
       server: {
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT),
+        host: process.env.SMTP_HOST!,
+        port: parseInt(process.env.SMTP_PORT!, 10), // ✅ Safer parse
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASSWORD,
+          user: process.env.SMTP_USER!,
+          pass: process.env.SMTP_PASSWORD!,
         },
       },
-      from: process.env.SMTP_FROM,
+      from: process.env.SMTP_FROM!,
     }),
+
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -69,8 +82,8 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid credentials");
         }
 
-        const isPasswordValid = await compare(credentials.password, user.password);
-        if (!isPasswordValid) {
+        const isValid = await compare(credentials.password, user.password);
+        if (!isValid) {
           throw new Error("Invalid credentials");
         }
 
@@ -95,11 +108,7 @@ export const authOptions: NextAuthOptions = {
         const dbUser = await prisma.user.findUnique({
           where: { email: user.email ?? "" },
           include: {
-            userRoles: {
-              include: {
-                role: true,
-              },
-            },
+            userRoles: { include: { role: true } },
           },
         });
 
@@ -111,18 +120,22 @@ export const authOptions: NextAuthOptions = {
           token.roles = dbUser.userRoles.map((ur) => ur.role);
         }
       }
+
       return token;
     },
+
     async session({ session, token }) {
       if (session.user && token) {
-        session.user.id = token.id as string;
-        session.user.firstName = token.firstName as string;
-        session.user.lastName = token.lastName as string;
-        session.user.name = token.name as string;
-        session.user.roles = token.roles as any[];
+        session.user.id = token.id!;
+        session.user.firstName = token.firstName!;
+        session.user.lastName = token.lastName!;
+        session.user.name = token.name!;
+        session.user.roles = token.roles!;
       }
+
       return session;
     },
+
     async signIn({ user, account }) {
       if (!user?.email) return false;
 
@@ -132,7 +145,7 @@ export const authOptions: NextAuthOptions = {
 
       if (!existingUser) return false;
 
-      // For email magic link login, ensure password exists
+      // Block sign-in if using email login and no password exists
       if (account?.provider === "email" && !existingUser.password) {
         return false;
       }
@@ -144,5 +157,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET!,
 };

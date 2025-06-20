@@ -19,14 +19,14 @@ export const authOptions: NextAuthOptions = {
   providers: [
     EmailProvider({
       server: {
-        host: process.env.EMAIL_SERVER_HOST,
-        port: Number(process.env.EMAIL_SERVER_PORT),
+        host: process.env.EMAIL_SERVER_HOST!,
+        port: Number(process.env.EMAIL_SERVER_PORT!),
         auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
+          user: process.env.EMAIL_SERVER_USER!,
+          pass: process.env.EMAIL_SERVER_PASSWORD!,
         },
       },
-      from: process.env.EMAIL_FROM,
+      from: process.env.EMAIL_FROM!,
     }),
     CredentialsProvider({
       name: 'credentials',
@@ -63,11 +63,15 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.id = user.id;
+      if (user) {
+        token.id = user.id;
+      }
       return token;
     },
     async session({ session, token }) {
-      if (session?.user) session.user.id = token.id as string;
+      if (session.user && token.id) {
+        (session.user as { id: string }).id = token.id as string;
+      }
       return session;
     },
   },
